@@ -1,13 +1,13 @@
 package com.arkadygamza.shakedetector;
 
 import android.content.Context;
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
 
 import com.jjoe64.graphview.GraphView;
 
@@ -51,12 +51,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         Observable.from(mPlotters).subscribe(SensorPlotter::onResume);
-        mShakeSubscription = mShakeObservable.subscribe((object) -> beep());
-    }
-
-    private static void beep() {
-        ToneGenerator toneG = new ToneGenerator(AudioManager.STREAM_SYSTEM, 100);
-        toneG.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 200);
+        mShakeSubscription = mShakeObservable.subscribe((object) -> Utils.beep());
     }
 
     @Override
@@ -76,5 +71,9 @@ public class MainActivity extends AppCompatActivity {
             sb.append("\n version: " + sensor.getVersion());
             Log.d("!!!", sb.toString());
         }
+    }
+
+    public void onClick(View view) {
+        startActivity(new Intent(this, MarblesActivity.class));
     }
 }

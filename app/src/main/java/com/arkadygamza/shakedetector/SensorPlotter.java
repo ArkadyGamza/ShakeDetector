@@ -32,8 +32,8 @@ public class SensorPlotter {
     private Subscription mSubscription;
 
 
-    public SensorPlotter(@NonNull String name, GraphView graphView,
-                         Observable<SensorEvent> sensorEventObservable) {
+    public SensorPlotter(@NonNull String name, @NonNull  GraphView graphView,
+                         @NonNull Observable<SensorEvent> sensorEventObservable) {
         mName = name;
         mSensorEventObservable = sensorEventObservable;
 
