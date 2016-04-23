@@ -1,9 +1,7 @@
 package com.arkadygamza.shakedetector;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.hardware.Sensor;
-import android.hardware.SensorEvent;
 import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
@@ -13,27 +11,19 @@ import android.util.Log;
 
 import com.jjoe64.graphview.GraphView;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import rx.Observable;
 import rx.Subscription;
-import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final int THRESHOLD = 15;
-    public static final int SHAKES_COUNT = 3;
-    public static final int SHAKES_PERIOD = 1;
     private SensorManager mSensorManager;
-    private Sensor mGravSensor;
-    private SensorListener mGravListener;
-    private SensorListener mAccListener;
-    private Sensor mAccSensor;
-    private SensorDeltaListener mDeltaListener;
-    private Observable<SensorEvent> mAccelerationObservable;
-    private CompositeSubscription mCompositeSubscription;
-    private Observable<SensorEvent> mGravityObservable;
+    private final List<SensorPlotter> mPlotters = new ArrayList<>(3);
+
+    private Observable mShakeObservable;
+    private Subscription mShakeSubscription;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,47 +34,24 @@ public class MainActivity extends AppCompatActivity {
 
         List<Sensor> gravSensors = mSensorManager.getSensorList(Sensor.TYPE_GRAVITY);
         List<Sensor> accSensors = mSensorManager.getSensorList(Sensor.TYPE_ACCELEROMETER);
-
-        mGravSensor = gravSensors.get(0);
-        mAccSensor = accSensors.get(0);
+        List<Sensor> linearAccSensors = mSensorManager.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION);
 
         dumpSensorInfo(gravSensors);
         dumpSensorInfo(accSensors);
+        dumpSensorInfo(linearAccSensors);
 
-        mGravListener = new SensorListener("GRAV", (GraphView) findViewById(R.id.graph1), Color.RED, Color.GREEN, Color.BLUE);
-        mAccListener = new SensorListener("ACC", (GraphView) findViewById(R.id.graph2), Color.RED, Color.GREEN, Color.BLUE);
-        mDeltaListener = new SensorDeltaListener("DELTA", (GraphView) findViewById(R.id.graph3), Color.RED, Color.GREEN, Color.BLUE);
+        mPlotters.add(new SensorPlotter("GRAV", (GraphView) findViewById(R.id.graph1), ObservableSensorListener.create(gravSensors.get(0), mSensorManager)));
+        mPlotters.add(new SensorPlotter("ACC", (GraphView) findViewById(R.id.graph2), ObservableSensorListener.create(accSensors.get(0), mSensorManager)));
+        mPlotters.add(new SensorPlotter("LIN", (GraphView) findViewById(R.id.graph3), ObservableSensorListener.create(linearAccSensors.get(0), mSensorManager)));
 
-        mAccelerationObservable = ObservableSensorListener.create(mAccSensor, mSensorManager);
-        mGravityObservable = ObservableSensorListener.create(mGravSensor, mSensorManager);
+        mShakeObservable = ShakeDetector.create(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-
-        mSensorManager.registerListener(mGravListener, mGravSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(mAccListener, mAccSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(mDeltaListener, mGravSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(mDeltaListener, mAccSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        mCompositeSubscription = new CompositeSubscription();
-
-        Observable<Float> gravityObservable = mGravityObservable.map(sensorEvent -> sensorEvent.values[0]);
-
-        Subscription subscription = mAccelerationObservable
-            .map(sensorEvent -> sensorEvent.values[0])
-            .withLatestFrom(gravityObservable, (acceleration, gravity) -> acceleration - gravity)
-            .filter(shake -> shake > THRESHOLD || shake < -THRESHOLD)
-            .buffer(2, 1)
-            .filter(buf -> buf.get(0) * buf.get(1) < 0)
-            .doOnNext(val -> Log.d("!!!!", "filtered by sign: " + val))
-            .timestamp()
-            .buffer(SHAKES_COUNT, 1)
-            .filter(buffer -> buffer.get(buffer.size() - 1).getTimestampMillis() - buffer.get(0).getTimestampMillis() < SHAKES_PERIOD*1000)
-            .throttleFirst(SHAKES_PERIOD, TimeUnit.SECONDS)
-            .subscribe(shake -> {Log.d("!!!!", "BOOM " + shake); beep();});
-
-        mCompositeSubscription.add(subscription);
+        Observable.from(mPlotters).subscribe(SensorPlotter::onResume);
+        mShakeSubscription = mShakeObservable.subscribe((object) -> beep());
     }
 
     private static void beep() {
@@ -95,11 +62,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        mSensorManager.unregisterListener(mGravListener);
-        mSensorManager.unregisterListener(mAccListener);
-        mSensorManager.unregisterListener(mDeltaListener);
-
-        mCompositeSubscription.unsubscribe();
+        Observable.from(mPlotters).subscribe(SensorPlotter::onPause);
+        mShakeSubscription.unsubscribe();
     }
 
     private void dumpSensorInfo(List<Sensor> gravSensors) {
