@@ -12,9 +12,11 @@ import rx.android.MainThreadSubscription;
 /**
  * Allows to treat sensor events as Observable
  */
-public class ObservableSensorListener {
-    public static Observable<SensorEvent> create(@NonNull Sensor sensor, @NonNull SensorManager sensorManager) {
+public class SensorEventObservableFactory {
+    public static Observable<SensorEvent> createSensorEventObservable(@NonNull Sensor sensor, @NonNull SensorManager sensorManager) {
         return Observable.create(subscriber -> {
+            MainThreadSubscription.verifyMainThread();
+
             SensorEventListener listener = new SensorEventListener() {
                 @Override
                 public void onSensorChanged(SensorEvent event) {
@@ -33,6 +35,7 @@ public class ObservableSensorListener {
 
             sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME);
 
+            // unregister listener in main thread when being unsubscribed
             subscriber.add(new MainThreadSubscription() {
                 @Override
                 protected void onUnsubscribe() {

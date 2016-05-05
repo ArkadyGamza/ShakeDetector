@@ -7,6 +7,8 @@ import android.hardware.SensorManager;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -17,10 +19,48 @@ public class ShakeDetector {
     public static final int THRESHOLD = 13;
     public static final int SHAKES_COUNT = 3;
     public static final int SHAKES_PERIOD = 1;
+    private static final String TAG = ShakeDetector.class.getSimpleName();
+
+    private static class XEvent {
+        public final long timestamp;
+        public final float x;
+
+        private XEvent(long timestamp, float x) {
+            this.timestamp = timestamp;
+            this.x = x;
+        }
+    }
+
+    public static void art(@NonNull Context context) {
+        createAccelerationObservable(context)
+            .map(sensorEvent -> new XEvent(sensorEvent.timestamp, sensorEvent.values[0]))
+            .filter(xEvent -> Math.abs(xEvent.x) > THRESHOLD)
+//            .subscribe(xEvent -> Log.d(TAG, formatMsg(xEvent)));
+            .buffer(2, 1)
+            .filter(buf -> buf.get(0).x * buf.get(1).x < 0)
+            .subscribe(buf -> Log.d(TAG, getLogMsg(buf)));
+    }
+
+    @NonNull
+    private static String getLogMsg(List<XEvent> buf) {
+        return "["+ formatMsg(buf.get(0)) +"; " + formatMsg(buf.get(1))+ "]" ;
+    }
+
+    @NonNull
+    private static String formatMsg(XEvent sensorEvent0) {
+        return formatTime(sensorEvent0.timestamp) + " " + sensorEvent0.x;
+    }
+
+    static final SimpleDateFormat dateFormat = new SimpleDateFormat("ss.SSS");
+
+    @NonNull
+    private static String formatTime(long ns) {
+        return dateFormat.format(new Date(ns / 1000000));
+    }
 
     @NonNull
     public static Observable create(@NonNull Context context) {
-        Observable<SensorEvent> eventObservable = getSensorEventObservable(context);
+        Observable<SensorEvent> eventObservable = createAccelerationObservable(context);
 
         return eventObservable
             .map(sensorEvent -> sensorEvent.values[0])
@@ -36,7 +76,7 @@ public class ShakeDetector {
     }
 
     public static Observable create(@NonNull Context context, @NonNull MarblesPlotter marblesPlotter) {
-        Observable<SensorEvent> eventObservable = getSensorEventObservable(context);
+        Observable<SensorEvent> eventObservable = createAccelerationObservable(context);
 
         return eventObservable
             .map(sensorEvent -> sensorEvent.values[0])
@@ -48,7 +88,6 @@ public class ShakeDetector {
             .buffer(2, 1)
             .filter(buf -> buf.get(0) * buf.get(1) < 0)
             .doOnNext(val -> marblesPlotter.addMarble(2, true))
-
             .timestamp()
             .buffer(SHAKES_COUNT, 1)
             .filter(buffer -> buffer.get(buffer.size() - 1).getTimestampMillis() - buffer.get(0).getTimestampMillis() < SHAKES_PERIOD * 1000)
@@ -59,13 +98,13 @@ public class ShakeDetector {
     }
 
     @NonNull
-    private static Observable<SensorEvent> getSensorEventObservable(@NonNull Context context) {
+    private static Observable<SensorEvent> createAccelerationObservable(@NonNull Context context) {
         SensorManager mSensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         List<Sensor> sensorList = mSensorManager.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION);
         if (sensorList == null || sensorList.isEmpty()) {
             throw new IllegalStateException("Device has no linear acceleration sensor");
         }
 
-        return ObservableSensorListener.create(sensorList.get(0), mSensorManager);
+        return SensorEventObservableFactory.createSensorEventObservable(sensorList.get(0), mSensorManager);
     }
 }

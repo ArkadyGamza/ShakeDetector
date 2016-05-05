@@ -40,9 +40,9 @@ public class MainActivity extends AppCompatActivity {
         dumpSensorInfo(accSensors);
         dumpSensorInfo(linearAccSensors);
 
-        mPlotters.add(new SensorPlotter("GRAV", (GraphView) findViewById(R.id.graph1), ObservableSensorListener.create(gravSensors.get(0), mSensorManager)));
-        mPlotters.add(new SensorPlotter("ACC", (GraphView) findViewById(R.id.graph2), ObservableSensorListener.create(accSensors.get(0), mSensorManager)));
-        mPlotters.add(new SensorPlotter("LIN", (GraphView) findViewById(R.id.graph3), ObservableSensorListener.create(linearAccSensors.get(0), mSensorManager)));
+        mPlotters.add(new SensorPlotter("GRAV", (GraphView) findViewById(R.id.graph1), SensorEventObservableFactory.createSensorEventObservable(gravSensors.get(0), mSensorManager)));
+        mPlotters.add(new SensorPlotter("ACC", (GraphView) findViewById(R.id.graph2), SensorEventObservableFactory.createSensorEventObservable(accSensors.get(0), mSensorManager)));
+        mPlotters.add(new SensorPlotter("LIN", (GraphView) findViewById(R.id.graph3), SensorEventObservableFactory.createSensorEventObservable(linearAccSensors.get(0), mSensorManager)));
 
         mShakeObservable = ShakeDetector.create(this);
     }
@@ -52,6 +52,8 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         Observable.from(mPlotters).subscribe(SensorPlotter::onResume);
         mShakeSubscription = mShakeObservable.subscribe((object) -> Utils.beep());
+
+        ShakeDetector.art(this);
     }
 
     @Override
