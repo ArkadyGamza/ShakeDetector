@@ -16,7 +16,7 @@ import rx.Subscription;
  */
 public class SensorPlotter {
     public static final int MAX_DATA_POINTS = 50;
-    public static final int VIEWPORT_SECONDS = 10;
+    public static final int VIEWPORT_SECONDS = 5;
     public static final int FPS = 10;
 
     @NonNull
@@ -41,7 +41,12 @@ public class SensorPlotter {
         graphView.getViewport().setMinX(0);
         graphView.getViewport().setMaxX(VIEWPORT_SECONDS * 1000); // number of ms in viewport
 
+        graphView.getViewport().setYAxisBoundsManual(true);
+        graphView.getViewport().setMinY(-20);
+        graphView.getViewport().setMaxY(20);
+
         graphView.getGridLabelRenderer().setHorizontalLabelsVisible(false);
+        graphView.getGridLabelRenderer().setVerticalLabelsVisible(false);
 
         mSeriesX = new LineGraphSeries<>();
         mSeriesY = new LineGraphSeries<>();
