@@ -20,8 +20,8 @@ public class ShakeDetector {
     @NonNull
     public static Observable<?> create(@NonNull Context context) {
         return createAccelerationObservable(context)
+            .filter(sensorEvent -> Math.abs(sensorEvent.values[0]) > THRESHOLD)
             .map(sensorEvent -> new XEvent(sensorEvent.timestamp, sensorEvent.values[0]))
-            .filter(xEvent -> Math.abs(xEvent.x) > THRESHOLD)
             .buffer(2, 1)
             .filter(buf -> buf.get(0).x * buf.get(1).x < 0)
             .map(buf -> buf.get(1).timestamp / 1000000000f)
